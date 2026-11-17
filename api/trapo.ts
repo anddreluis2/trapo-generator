@@ -1,44 +1,63 @@
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas'
 import { join } from 'node:path'
 import { HEIGHT, WIDTH, renderTrapo } from '../src/render.js'
-import { TEAMS, findTeam } from '../src/teams.js'
+import { parseCommand } from '../src/command.js'
+import { splitPhrase } from '../src/split.js'
+import { DEFAULT_TEAM, TEAMS, findTeam } from '../src/teams.js'
 
 GlobalFonts.registerFromPath(join(process.cwd(), 'public/fonts/Anton-Regular.ttf'), 'Anton')
 
 const MAX_LEN = 300
-const CORS = { 'Access-Control-Allow-Origin': '*' }
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'X-Trapo-Cima, X-Trapo-Baixo' }
 
-type Input = { time?: unknown; cima?: unknown; baixo?: unknown }
+type Input = Record<string, unknown>
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
 function error(status: number, message: string) {
   return Response.json({ error: message }, { status, headers: CORS })
 }
 
-function render(input: Input) {
-  const time = typeof input.time === 'string' ? input.time : ''
-  const cima = typeof input.cima === 'string' ? input.cima : ''
-  const baixo = typeof input.baixo === 'string' ? input.baixo : ''
+const USAGE = 'Uso: !trapo <frase> :time=gremio  (ou :gremio). Use | pra escolher onde quebra.'
 
-  const team = findTeam(time)
-  if (!team) return error(400, `time invalido. Use um de: ${TEAMS.map((t) => t.id).join(', ')}`)
-  if (!cima.trim() && !baixo.trim()) return error(400, 'mande pelo menos cima ou baixo')
-  if (cima.length > MAX_LEN || baixo.length > MAX_LEN) return error(400, `max ${MAX_LEN} caracteres por frase`)
+function render(raw: Input) {
+  // `cmd` takes the raw chat message ("@Gork !trapo ... :time=gremio").
+  // Explicit fields still win over what's parsed from it.
+  const cmd = str(raw.cmd) || str(raw.msg)
+  let input = raw
+  if (cmd) {
+    const parsed = parseCommand(cmd)
+    input = { frase: parsed.frase, ...parsed.params, ...raw }
+  }
+
+  const time = str(input.time)
+  const team = time ? findTeam(time) : DEFAULT_TEAM
+  if (!team) return error(400, `time desconhecido: "${time}". Times: ${TEAMS.map((t) => t.id).join(', ')}`)
+
+  // Either one phrase (split automatically) or explicit cima/baixo.
+  const frase = str(input.frase) || str(input.texto) || str(input.q)
+  let cima = str(input.cima)
+  let baixo = str(input.baixo)
+  if (!cima && !baixo) ({ top: cima, bottom: baixo } = splitPhrase(frase))
+
+  if (!cima.trim() && !baixo.trim()) return error(400, cmd ? `Faltou a frase. ${USAGE}` : 'manda a frase: ?frase=... (ou cima=... e baixo=...)')
+  if (cima.length + baixo.length > MAX_LEN) return error(400, `frase muito grande, max ${MAX_LEN} caracteres`)
 
   const canvas = createCanvas(WIDTH, HEIGHT)
   renderTrapo(canvas.getContext('2d'), team, cima, baixo)
-  const png = canvas.toBuffer('image/png')
-  return new Response(new Uint8Array(png), {
+  return new Response(new Uint8Array(canvas.toBuffer('image/png')), {
     headers: {
       ...CORS,
       'Content-Type': 'image/png',
       'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Trapo-Cima': encodeURIComponent(cima),
+      'X-Trapo-Baixo': encodeURIComponent(baixo),
     },
   })
 }
 
 export function GET(req: Request) {
-  const p = new URL(req.url).searchParams
-  return render({ time: p.get('time') ?? undefined, cima: p.get('cima') ?? undefined, baixo: p.get('baixo') ?? undefined })
+  return render(Object.fromEntries(new URL(req.url).searchParams))
 }
 
 export async function POST(req: Request) {

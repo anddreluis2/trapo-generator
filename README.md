@@ -16,6 +16,8 @@ GET /api/trapo?time=inter&frase=Vendi o carro pra pagar o sócio torcedor
 | `frase` | yes*     | Split automatically. Use `\|` or a newline to choose the break yourself. `texto` and `q` also work. |
 | `time`  | no       | Defaults to `gremio`. Takes an id, a name or an alias (`colorado`, `coxa`, `Grêmio`...). |
 | `cima` / `baixo` | no | Set the two bands explicitly. Overrides `frase`. |
+| `fonte` | no       | Max font size in px, integer from 40 to 200. Defaults to `110`. Text still shrinks to fit its band. |
+| `altura` | no      | Stretches the letters vertically, in percent, integer from 100 to 250. Defaults to `100`. Width is unchanged. |
 
 \* either `frase` or `cima`/`baixo`. Max 300 characters total.
 
@@ -42,10 +44,12 @@ Forward the raw message as `cmd`. The API drops mentions and the `!trapo` trigge
 @Gork !trapo eh os guri da catequese :time=gremio
 @Gork !trapo vendi o carro pra pagar o sócio torcedor :inter
 @Gork !trapo larguei tudo | pra ver o jogo :time="sao paulo"
+@Gork !trapo vai grêmio :fonte=180
 ```
 
 - `:time=x` or just `:x` picks the team (id, name or alias). Without one it uses `gremio`.
 - `|` forces where the line breaks.
+- `:fonte=80` sets the max font size, `:altura=150` stretches the letters vertically.
 - Any other `:key=value` is passed through (`:cima=...`, `:baixo=...`).
 
 ```js

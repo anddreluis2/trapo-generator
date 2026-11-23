@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_TEAM, TEAMS } from './teams'
-import { HEIGHT, WIDTH, renderTrapo } from './render'
+import {
+  DEFAULT_FONT_SIZE,
+  DEFAULT_STRETCH,
+  HEIGHT,
+  MAX_FONT_SIZE,
+  MAX_STRETCH,
+  MIN_FONT_SIZE,
+  MIN_STRETCH,
+  WIDTH,
+  renderTrapo,
+} from './render'
 import { splitPhrase } from './split'
 
 const REPO = 'https://github.com/anddreluis2/trapo-generator'
@@ -23,6 +33,8 @@ export default function App() {
   const prevTeamRef = useRef<string | null>(null)
   const [teamId, setTeamId] = useState(DEFAULT_TEAM.id)
   const [phrase, setPhrase] = useState(DEFAULT_PHRASE)
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE)
+  const [stretch, setStretch] = useState(DEFAULT_STRETCH)
   const [fontReady, setFontReady] = useState(false)
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const [theme, setTheme] = useState<Theme>(initialTheme)
@@ -54,8 +66,8 @@ export default function App() {
 
     canvas.width = WIDTH
     canvas.height = HEIGHT
-    renderTrapo(ctx, team, top, bottom)
-  }, [team, top, bottom, fontReady])
+    renderTrapo(ctx, team, top, bottom, fontSize, stretch)
+  }, [team, top, bottom, fontSize, stretch, fontReady])
 
   useEffect(() => {
     if (copyState === 'idle') return
@@ -130,14 +142,26 @@ export default function App() {
   }, [download, copy])
 
   const apiPhrase = phrase.trim().replace(/\s*\n\s*/g, ' | ')
-  const apiHref = `/api/trapo?time=${team.id}&frase=${encodeURIComponent(apiPhrase)}`
-  const apiLabel = `/api/trapo?time=${team.id}&frase=${apiPhrase.replace(/ /g, '+')}`
+  const apiFont =
+    (fontSize === DEFAULT_FONT_SIZE ? '' : `&fonte=${fontSize}`) +
+    (stretch === DEFAULT_STRETCH ? '' : `&altura=${stretch}`)
+  const apiHref = `/api/trapo?time=${team.id}${apiFont}&frase=${encodeURIComponent(apiPhrase)}`
+  const apiLabel = `/api/trapo?time=${team.id}${apiFont}&frase=${apiPhrase.replace(/ /g, '+')}`
 
   return (
     <div className="page">
       <nav className="nav">
         <a className="brand" href="/">
-          <span className="mark" style={{ ['--mark-top' as string]: team.topBg, ['--mark-bottom' as string]: team.bottomBg }} aria-hidden />
+          <span
+            className="mark"
+            data-stripe={team.stripe ? '' : undefined}
+            style={{
+              ['--mark-top' as string]: team.topBg,
+              ['--mark-bottom' as string]: team.bottomBg,
+              ['--mark-stripe' as string]: team.stripe,
+            }}
+            aria-hidden
+          />
           trapo
         </a>
         <div className="nav-links">
@@ -200,8 +224,9 @@ export default function App() {
                     className="team"
                     onClick={() => setTeamId(t.id)}
                   >
-                    <span className="swatch" aria-hidden>
+                    <span className="swatch" data-stripe={t.stripe ? '' : undefined} aria-hidden>
                       <span style={{ background: t.topBg }} />
+                      {t.stripe && <span style={{ background: t.stripe }} />}
                       <span style={{ background: t.bottomBg }} />
                     </span>
                     {t.name}
@@ -209,6 +234,36 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            <label className="field">
+              <span className="label-row">
+                <span className="label">Tamanho da fonte</span>
+                <span className="value">{fontSize}px</span>
+              </span>
+              <input
+                type="range"
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
+                step={2}
+                value={fontSize}
+                onChange={(e) => setFontSize(Number(e.target.value))}
+              />
+            </label>
+
+            <label className="field">
+              <span className="label-row">
+                <span className="label">Altura da letra</span>
+                <span className="value">{stretch}%</span>
+              </span>
+              <input
+                type="range"
+                min={MIN_STRETCH}
+                max={MAX_STRETCH}
+                step={5}
+                value={stretch}
+                onChange={(e) => setStretch(Number(e.target.value))}
+              />
+            </label>
 
             <div className="actions">
               <button type="button" className="btn btn-dark" onClick={download}>

@@ -1,6 +1,16 @@
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas'
 import { join } from 'node:path'
-import { HEIGHT, WIDTH, renderTrapo } from '../src/render.js'
+import {
+  DEFAULT_FONT_SIZE,
+  DEFAULT_STRETCH,
+  HEIGHT,
+  MAX_FONT_SIZE,
+  MAX_STRETCH,
+  MIN_FONT_SIZE,
+  MIN_STRETCH,
+  WIDTH,
+  renderTrapo,
+} from '../src/render.js'
 import { parseCommand } from '../src/command.js'
 import { splitPhrase } from '../src/split.js'
 import { DEFAULT_TEAM, TEAMS, findTeam } from '../src/teams.js'
@@ -11,6 +21,12 @@ const MAX_LEN = 300
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Expose-Headers': 'X-Trapo-Cima, X-Trapo-Baixo' }
 
 type Input = Record<string, unknown>
+
+function intParam(v: unknown, fallback: number, min: number, max: number) {
+  if (v === undefined || v === '') return fallback
+  const n = Number(v)
+  return Number.isInteger(n) && n >= min && n <= max ? n : null
+}
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 
@@ -43,8 +59,13 @@ function render(raw: Input) {
   if (!cima.trim() && !baixo.trim()) return error(400, cmd ? `Faltou a frase. ${USAGE}` : 'manda a frase: ?frase=... (ou cima=... e baixo=...)')
   if (cima.length + baixo.length > MAX_LEN) return error(400, `frase muito grande, max ${MAX_LEN} caracteres`)
 
+  const fonte = intParam(input.fonte, DEFAULT_FONT_SIZE, MIN_FONT_SIZE, MAX_FONT_SIZE)
+  if (fonte === null) return error(400, `Fonte precisa ser um número inteiro entre ${MIN_FONT_SIZE} e ${MAX_FONT_SIZE}`)
+  const altura = intParam(input.altura, DEFAULT_STRETCH, MIN_STRETCH, MAX_STRETCH)
+  if (altura === null) return error(400, `Altura precisa ser um número inteiro entre ${MIN_STRETCH} e ${MAX_STRETCH}`)
+
   const canvas = createCanvas(WIDTH, HEIGHT)
-  renderTrapo(canvas.getContext('2d'), team, cima, baixo)
+  renderTrapo(canvas.getContext('2d'), team, cima, baixo, fonte, altura)
   return new Response(new Uint8Array(canvas.toBuffer('image/png')), {
     headers: {
       ...CORS,
